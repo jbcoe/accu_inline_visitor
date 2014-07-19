@@ -1,0 +1,117 @@
+\documentclass[10pt,a4paper,twocolumn]{article}
+
+% Use packages
+\usepackage{newcent}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{mathrsfs}
+\usepackage{color}
+
+% Set lengths
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{10pt}
+\addtolength{\columnsep}{0.05in}
+\addtolength{\textwidth}{1in}
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\topmargin}{-1in}
+\addtolength{\textheight}{1.5in}
+
+% Little hypenation, left aligned
+\hyphenpenalty=1000
+\raggedright
+
+\makeatother
+
+\renewcommand\section[1]{
+%    \fcolorbox{white}{yellow}
+%    {
+    \begin{minipage}[c]{0.94\linewidth}
+    \large \raggedright \sffamily \textbf{#1}
+    \end{minipage}
+%    }
+}
+
+\newcommand\mycode[1]{{\small\texttt{#1}}}
+
+\makeatletter
+
+\begin{document}
+
+Object-oriented programmers often wish to perform a function on an object of polymorphic type such that the operation of the function is specific to the derived type. For instance, suppose we derive from the abstract base class \mycode{IPolygon} the concrete classes \mycode{CSquare} and \mycode{CTriangle}. Now suppose that we require a function \mycode{Angles}, which returns a vector containing the interior angles of a given polygon, \mycode{p}.
+
+{\small\begin{verbatim}
+struct IPolygon { };
+
+struct CSquare : public IPolygon
+{
+  double m_edge;
+}
+
+struct CTriangle : public IPolygon
+{
+  std::array<double, 3> m_edges;
+}
+
+std::vector<double> Angles(const IPolygon& p);
+{
+  // implementation
+}
+\end{verbatim}}
+
+Naturally, the algorithm used by \mycode{Angles} to compute its result depends on the derived type of \mycode{p}, which is problematic, because its argument is conveyed by a reference of the base class type, \mycode{IPolygon}.
+
+\begin{section}{Implement as a member function}
+
+The first solution is to implement functions in the derived classes of \mycode{CSquare} and \mycode{CTriangle}, and make them accessible via a pure virtual function in the interface of \mycode{IPolygon}.
+
+{\small\begin{verbatim}
+struct IPolygon
+{
+  std::vector<double> Angles() const = 0;
+};
+
+struct CSquare : public IShape
+{
+  std::vector<double> Angles() const override
+  {
+    // implementation
+  }
+
+  double m_edge;
+};
+
+struct CTriangle : public IShape
+{
+  std::vector<double> Angles() const override
+  {
+    // implementation
+  }
+
+  std::array<double, 3> m_edges;
+};
+\end{verbatim}}
+
+The interior angles of an \mycode{IPolygon& p} can now be returned by invoking its member function \mycode{Angles}. The principal and well-known benefit of this approach is that any program that introduces a new concrete type of \mycode{IPolygon} and neglects to implement its \mycode{Angles} interface will fail to compile.
+
+However, if this strategy is adopted in the ongoing development of large code bases, bloated interfaces and implementations are inevitable. Types which start out with a simple, clean implementation will accrue additional member functions every time an algorithm is needed that relies on the derived type.  The list of member functions in our example class \mycode{IPolygon} could grow indefinitely long, to include \mycode{Area}, \mycode{Perimeter}, \mycode{Vertices}, \mycode{IsSymmetric}, and so on. 
+
+This proliferation of members is compounded by two further disadvantages. Firstly, in some cases, the inclusion of a member function is inappropriate. For instance, consider the function \mycode{CalculateCost}, which returns the cost associated with the automatated machine-cutting of a shape. \mycode{CalculateCost} is not esssential to polygons \emph{per se}, in the way that \mycode{Area} and \mycode{Perimeter} are. Secondly, even if \mycode{CalculateCost} were included in the interface, it is possible that at some later stage the developer may wish to provide several switchable implementations, necessitating awkward dependency injections (at best), or additional flags and switches in the argument list of \mycode{CalculateCost} (at worst).
+
+At this juncture it should be clear that we require a method for defining functions external to the derived class definitions. Before turning to the visitor pattern, we consider the pros and cons of real-time type identification (RTTI), which accomplishes precisely this.
+
+\begin{section}{Real-time type identification}
+
+\textit{to do}
+
+\begin{section}{The visitor pattern}
+
+\textit{to do}
+
+\begin{section}{The inline visitor pattern}
+
+\textit{to do}
+
+\end{document}
+
+% end of file %
