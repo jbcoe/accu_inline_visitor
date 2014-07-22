@@ -36,148 +36,105 @@
 
 \makeatletter
 
-\begin{document}
+\title{An Inline Visitor Design Pattern for C++11}
+\author{Robert W. Mill \and Jonathan B. Coe}
 
-Object-oriented programmers often wish to perform a function on an object of polymorphic type, such that the behaviour of the function is specific to the derived type. For instance, suppose we derive from the abstract base class \mycode{IPolygon} the concrete classes \mycode{CSquare} and \mycode{CTriangle}. Now suppose that we require a function \mycode{Angles}, which returns a vector containing the interior angles of a given polygon, \mycode{p}.
+\begin{document}
+\maketitle
+
+Object-oriented programmers often wish to perform a function on an object of polymorphic type, such that the behaviour of the function is specific to the derived type. For instance, suppose we derive from the abstract base class \mycode{Polygon} the concrete classes \mycode{Triangle} and \mycode{Square}. Now suppose that we require a function \mycode{CountSides}, which returns the number of sides in the polygon, \mycode{p}.
 
 {\small\begin{verbatim}
-struct IPolygon { };
+struct Polygon { };
 
-struct CSquare : public IPolygon
+struct Triangle : Polygon
 {
-  double m_edge;
+  // members
 }
 
-struct CTriangle : public IPolygon
+struct Square : Polygon
 {
-  std::array<double, 3> m_edges;
+  // members
 }
 
-std::vector<double> Angles(const IPolygon& p);
+int CountSides(Polygon& p);
 {
   // implementation
 }
 \end{verbatim}}
 
-Naturally, the algorithm used by \mycode{Angles} to compute its result depends on the derived type of \mycode{p}, which is problematic, because its argument is conveyed by a reference of the base class type, \mycode{IPolygon}.
+Naturally, the algorithm used by \mycode{Angles} to compute its result depends on the derived type of \mycode{p}, which is problematic, because its argument is conveyed by a reference of the base class type, \mycode{Polygon}.
 
+\section{Visitor pattern}
 
-\section{Virtual member functions}
+The \emph{visitor} design pattern offers a mechanism for switching to a code path specific to the derived type. The pattern uses the \mycode{this} pointer inside the class to identify the derived type. Each derived object must accept a visitor interface which provides a list of \mycode{Visit} members with single argument overloaded on various derived types.
 
-The first solution is to implement functions in the derived classes of \mycode{CSquare} and \mycode{CTriangle}, and provide access to them via a pure virtual function in the interface of \mycode{IPolygon}.
+To continue our illustration, the \mycode{PolygonVisitor} is able to `visit' \mycode{Triangle}s and \mycode{Square}s, and all these polygons must be able to `accept' an \mycode{PolygonVisitor}.
 
 {\small\begin{verbatim}
-struct IPolygon
+struct Triangle;
+struct Square;
+
+struct PolygonVisitor
 {
-  std::vector<double> Angles() const = 0;
+  virtual ~PolygonVisitor() {}
+
+  virtual void Visit(Triangle& tr) = 0;
+  virtual void Visit(Square& sq) = 0;
 };
 
-struct CSquare : public IShape
+struct Polygon : Polygon
 {
-  std::vector<double> Angles() const override
-  {
-    // implementation for square
-  }
-
-  double m_edge;
-};
-
-struct CTriangle : public IShape
-{
-  std::vector<double> Angles() const override
-  {
-    // implementation for triangle
-  }
-
-  std::array<double, 3> m_edges;
+  virtual void Accept(PolygonVisitor& v) = 0;
 };
 \end{verbatim}}
 
-The interior angles of an \mycode{IPolygon\& p} can now be returned by invoking its member function \mycode{Angles}. The principal and well-known benefit of this approach is that any program that introduces a new concrete type of \mycode{IPolygon} and neglects to implement its \mycode{Angles} interface will fail to compile.
+Squares and triangles accept the visitor as follows. Observe that the \mycode{this} pointer is used to select the appropriate overloaded function in the visitor interface.
 
-However, if this strategy is adopted in the ongoing development of large code bases, bloated interfaces and implementations are inevitable. Types which start out with a simple, clean implementation will accrue additional member functions every time an algorithm is needed that relies on the derived type.  The list of member functions in our example class \mycode{IPolygon} could grow indefinitely long, to include \mycode{Area}, \mycode{Perimeter}, \mycode{Vertices}, \mycode{IsSymmetric}, and so on. 
-
-This proliferation of members is compounded by two further disadvantages. Firstly, in some cases, the inclusion of a member function is inappropriate. For instance, consider the function \mycode{CalculateCost}, which returns the cost associated with the automatated machine-cutting of a shape. \mycode{CalculateCost} is not esssential to polygons \emph{per se}, in the way that \mycode{Area} and \mycode{Perimeter} are. Secondly, even if \mycode{CalculateCost} were included in the interface, it is possible that at some later stage the developer may wish to provide several switchable implementations, necessitating awkward dependency injections (at best), or additional flags and switches in the argument list of \mycode{CalculateCost} (at worst).
-
-At this juncture it should be clear that we require a method for defining functions external to the derived class definitions. Before turning to the visitor pattern, we consider the pros and cons of run-time type information (RTTI), which accomplishes precisely this.
-
-
-\section{Run-time type information}
-
-The \mycode{dynamic\_cast} and \mycode{typeid} keywords, which form part of RTTI in C++, can be used to identify the derived type of an object during a program execution. Listing X demonstrates how the \mycode{typeid} keyword can be deployed to determine whether an \mycode{IPolygon} is an \mycode{ISquare} or \mcode{ITriangle}.
-
-\begin{verbatim}
-std::vector<double> Angles(const IPolygon& p)
+{\small\begin{verbatim}
+struct Triangle : Polygon
 {
-  if( typeid(p) == typeid(CSquare) )
+  void Accept(PolygonVisitor& v) override
   {
-    auto& sq = static_cast<CSquare&>(p);
-    // implementation for square
+    v.Visit(*this);
   }
-  else if( typeid(p) == typeid(CTriangle) )
-  {
-    auto& tr = static_cast<CTriangle&>(p);
-    // implementation for triangle 
-  }
-  else
-  {
-    throw std::exception("Unknown polygon");
-  }
-}
-\end{verbatim}
-
-This implementation only costs a single virtual function table look-up, but also requires that \mycode{IPolygon} be an abstract type. If \mycode{IPolygon} is not abstract (or all virtual members are removed over time, rendering the base type concrete), then \mycode{typeid(p)} will return the base class type, and this code will fail.
-
-The \mycode{dynamic\_cast} keyword combines a run-time type check with a type cast. A possible implementation using \mycode{dynamic\_cast} to address our problem is given below.
-
-\begin{verbatim}
-std::vector<double> Angles(const IPolygon& p)
-{
-  auto pSq = dynamic_cast<CSquare*>(&p);
-  if( pSq )
-  {
-    // implementation for square
-    return;
-  }
-
-  auto pTr = dynamic_cast<CTriangle*>(&p);
-  if( pTr )	
-  {
-    // implementation for triangle
-    return;
-  }
-
-  throw std::exception("Unknown polygon");
-}
-\end{verbatim}
-
-This approach does not require that \mycode{IPolygon} be abstract, but does require multiple virtual function table lookups---one for each derived type.
-
-A key problem with both implementations outlined above is that they fail to provide code paths gracefully handle other types derived from \mycode{IPolygon} (e.g., \mycode{CHexagon}). This places a burden on the programmer remember to update these code portions every time a new type is derived. In the examples we have given, an exception is thrown when an unknown type is encountered in \mycode{Angles}, which is preferable to silently failing to handle an unknown type. But production code which throws exceptions for undefined code paths is inadmissible.
-
-It is widely considered that RTTI should be used sparingly in C++, if at all (refs). A third approach combines a type enum with a static cast to identify a type at run-time. A virtual function is included in the base class, which allows derived types to identify themselves via an enumerated type. With \mycode{IPolygon}, this would be achieved as follows.
-
-\begin{verbatim}
-struct IPolygon
-{
-  enum EPolygon { eTriangle, eSquare };
-	
-  virtual EPolygon GetType() const = 0;
 };
-\end{verbatim}
 
-\mycode{CSquare} and \mycode{CTriangle} must provide implementations which return the appropriate enum constants. Code which switches on the derived type would then call \mycode{GetType} and use \mycode{static\_cast} to get a pointer or reference. Although this pattern is very popular and ease to implement, it invites numerous pitfalls: copy-paste errors can easily lead to the derived class returning the wrong enum constant, or type casts may be incorrectly applied.
+struct Square : Polygon
+{
+  void Accept(PolygonVisitor& v) override
+  {
+    v.Visit(*this);
+  }
+};
+\end{verbatim}}
 
-In any event, defining type enumerations for this purpose is undesirable, as it means polluting interfaces with unnecessary member functions and symbols. The principled attempt to avoid real-time type information has failed: the programmer has simply reintroduced RTTI under another guise, one which offers no advantages over C++'s own. And the creation of code paths to handle newly-added derived types is still not enforced at compilation.
+A visitor object, \mycode{SideCounter}, which counts the number of sides of a polygon and stores the result, is implemented and used as follows.
 
-\section{The visitor pattern}
+{\small\begin{verbatim}
+struct SideCounter : PolygonVisitor
+{
+  void Visit(Square& sq) override
+  {
+    m_sides = 4;
+  }
+  
+  void Visit(Triangle& tr) override
+  {
+    m_sides = 3;
+  }
+  
+  int m_sides;
+};
 
-\textit{to do}
+int CountSides(Polygon& p)
+{
+  SideCounter sideCounter;
+  p.Accept(sideCounter);
+  return sideCounter.m_sides;
+}
+\end{verbatim}}
 
-
-\section{The inline visitor pattern}
-
-\textit{to do}
 
 \end{document}
 
