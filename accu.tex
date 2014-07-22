@@ -24,12 +24,15 @@
 \makeatother
 
 \renewcommand\section[1]{
-%    \fcolorbox{white}{yellow}
-%    {
     \begin{minipage}[c]{0.94\linewidth}
     \large \raggedright \sffamily \textbf{#1}
     \end{minipage}
-%    }
+}
+
+\renewcommand\subsection[1]{
+    \begin{minipage}[c]{0.94\linewidth}
+    \medium \raggedright \sffamily \textbf{#1}
+    \end{minipage}
 }
 
 \newcommand\mycode[1]{{\small\texttt{#1}}}
@@ -137,6 +140,8 @@ int CountSides(Polygon& p)
 
 \section{Inline visitor pattern}
 
+One potential drawback of the visitor pattern is that it requires the creation of a new visitor object type for each algoritm that operates on the derived type. In some cases, the creation of a dedicated class is excessive, and it would be more convenient to write the visitor clauses inline, in a form that resembles a \mycode{switch} statement, as shown in the listing below.
+
 {\small\begin{verbatim}
 int CountSides(Polygon& p)
 {
@@ -159,67 +164,26 @@ int CountSides(Polygon& p)
 }
 \end{verbatim}}
 
-%{\small\begin{verbatim}
-%template <typename T,
-          %typename F,
-          %typename B>
-%class add_visitor : public B
-%{
-%public:
-  %
-  %add_visitor(F f) : m_f(std::move(f)) {}
-  %
-  %void Visit(T& t)
-  %{
-    %m_f(t);
-  %}
-  %
-  %template<typename Tadd, typename Fadd>
-  %void on(Fadd& fadd)
-  %{
-    %return add_visitor
-      %<Tadd, Fadd, make_visitor<T,F,B>>
-      %(std::move(fadd))
-  %}
-%
-%private:
-%
-  %F m_f;
-%};
-%
-%template <typename V>
-%class make_visitor : public V
-%{
-%public:
-  %
-  %template<typename Tadd, typename Fadd>
-  %void on(Fadd& fadd)
-  %{
-    %return add_visitor
-      %<Tadd, Fadd, make_visitor<V>>
-      %(std::move(fadd))
-  %}
-%};
-%\end{verbatim}}
+In what follows we demonstrate generic code that permits the \mycode{begin\_visitor} ... \mycode{end\_visitor} construction to be used with any visitor base. The principle behind the pattern is simple. The initial \mycode{start\_visitor} call returns an object which implements the visitor interface \emph{abstractly}; subsequent calls of the \mycode{on} function implement a \mycode{Visit} function which takes objects of the template argument type as an argument; and the \mycode{end\_visitor} call returns the \emph{concrete} visitor object.
 
-\newpage
+\subsection{Listing 1}
 
 {\small
 \begin{verbatim}
 template <typename T,
           typename F,
-          typename BaseInnerVisitor,
+          typename BaseInner,
           typename ArgsT>
 class ComposeVisitor
 {
 public:
-  class InnerVisitor : public BaseInnerVisitor
+  class Inner : public BaseInner
   {
   public:
-    using BaseInnerVisitor::Visit;
+    using BaseInner::Visit;
   
-    InnerVisitor(ArgsT&& args) :
-      BaseInnerVisitor(std::move(args.second)),
+    Inner(ArgsT&& args) :
+      BaseInner(std::move(args.second)),
       m_f(std::move(args.first))
     {
     }
@@ -243,22 +207,22 @@ public:
   ComposeVisitor<
     Tadd,
     Fadd,
-    InnerVisitor,
+    Inner,
     std::pair<Fadd, ArgsT>> on(Fadd&& f)
   {
     return ComposeVisitor
       Tadd,
       Fadd,
-      InnerVisitor,
+      Inner,
       std::pair<Fadd, ArgsT>>(
         std::make_pair(
           std::move(f),
           std::move(m_args)));
   }
   
-  InnerVisitor end_visitor()
+  Inner end_visitor()
   {
-    return InnerVisitor(std::move(m_args));
+    return Inner(std::move(m_args));
   }
   
   ArgsT m_args;
@@ -268,29 +232,29 @@ template <typename TVisitorBase>
 class EmptyVisitor
 {
 public:
-  class InnerVisitor : public TVisitorBase
+  class Inner : public TVisitorBase
   {
   public:
     using TVisitorBase::Visit;
   
-    InnerVisitor(std::nullptr_t) {}
+    Inner(std::nullptr_t) {}
   };
   
   template <typename Tadd, typename Fadd>
   ComposeVisitor<
     Tadd,
     Fadd,
-    InnerVisitor,
+    Inner,
     std::pair<Fadd, std::nullptr_t>> on(Fadd&& f)
   {
     return ComposeVisitor<
       Tadd,
       Fadd,
-      InnerVisitor,
+      Inner,
       std::pair<Fadd, std::nullptr_t>>(
         std::make_pair(
-    	    std::move(f),
-    	    nullptr));
+          std::move(f),
+          nullptr));
   }
 };
 
@@ -300,6 +264,36 @@ EmptyVisitor<TVisitorBase> begin_visitor()
   return EmptyVisitor<TVisitorBase>();
 }
 \end{verbatim}}
+
+The \mycode{start\_visitor<V>} function returns an object $t_0 = \mbox{\mycode{EmptyVisitor<V>}}$ which has the pure visitor interface \mycode{V} as a base class, but does not implement any \mycode{Visit} members.
+
+Invoking \mycode{on<T1>} on a $t_0$ object returns an object which implements the \mycode{Visit(T1\&)} member that executes a function object with type \mycode{F1}. This object has type $t_1\, =$
+{\small\begin{verbatim}
+  ComposeVisitor<
+    T1,
+    F1,
+    EmptyVisitor<T>,
+    pair<F1,nullptr_t>>
+\end{verbatim}}
+which derives from $t_0$. (We omit \mycode{std::} for brevity.)
+
+Invoking \mycode{on<T2>} on a $t_1$ object returns an object which implements the \mycode{Visit(T2\&)} member that executes a function object with type \mycode{F2}. This object has type $t_2\, =$
+{\small\begin{verbatim}
+  ComposeVisitor<
+    T1,
+    F,
+    ComposeVisitor<
+        T1,
+        F,
+        EmptyVisitor<T>,
+        pair<F1,nullptr_t>>
+    pair<F2,<pair<F1,nullptr_t>>
+\end{verbatim}}
+which derives from $t_1$, and so forth. These nested calls proceeds until a type is available which implements all the visitor members.
+
+The pattern is complicated by the fact that no intermediate object returned in the nested series of calls to \mycode{on} is allowed to be abstract. As a solution, we construct the visitor type as an \emph{inner class}, and use \mycode{end\_visitor} to return an object of this inner class type at the end. Inner class types are allowed remain abstract, provided they are never constructed. If the \mycode{end\_visitor} function is invoked before the inner visitor class has concrete implementations for all \mycode{Visit} members, then the compiler will signal that the programmer has attempt to construct an object with an abstract type; otherwise a visitor is successfully returned.
+
+That inline visitors cannot be constructed when clauses are missing is desirable and fulfils one of the the original motivations for the visitor pattern. Two other advantages of this approach are notable compile-time. Firstly, because the \mycode{override} qualifier is included on the \mycode{Visit} member function, it is not possible to include a superfluous clause which does not correspond to a type overload in the visitor base. Secondly, because the \mycode{final} qualifier is included on the \mycode{Visit} member function it is not possible to include a visit clause more than once. (If the \mycode{final} keyword were omitted, the most recent call to \mycode{on} would be observed for a given type.)
 
 \end{document}
 

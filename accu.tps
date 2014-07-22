@@ -17,8 +17,8 @@ Class=LaTeXView
 Document=accu.tex
 
 [Frame0_View0,0]
-TopLine=124
-Cursor=3631
+TopLine=257
+Cursor=6951
 
 [SessionInfo]
 FrameCount=1
