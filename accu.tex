@@ -18,8 +18,8 @@
 \addtolength{\textheight}{1.5in}
 
 % Little hypenation, left aligned
-\hyphenpenalty=1000
-\raggedright
+\hyphenpenalty=10000
+%\raggedright
 
 \makeatother
 
@@ -78,6 +78,7 @@ To continue our illustration, the \mycode{PolygonVisitor} is able to `visit' \my
 struct Triangle;
 struct Square;
 
+
 struct PolygonVisitor
 {
   virtual ~PolygonVisitor() {}
@@ -86,7 +87,7 @@ struct PolygonVisitor
   virtual void Visit(Square& sq) = 0;
 };
 
-struct Polygon : Polygon
+struct Polygon
 {
   virtual void Accept(PolygonVisitor& v) = 0;
 };
@@ -119,28 +120,33 @@ struct SideCounter : PolygonVisitor
 {
   void Visit(Square& sq) override
   {
-    sides = 4;
+    m_sides = 4;
   }
   
   void Visit(Triangle& tr) override
   {
-    sides = 3;
+    m_sides = 3;
   }
   
-  int sides;
+  int m_sides=0;
 };
 
 int CountSides(Polygon& p)
 {
   SideCounter sideCounter;
   p.Accept(sideCounter);
-  return sideCounter.sides;
+  return sideCounter.m_sides;
 }
 \end{verbatim}}
 
 \section{Inline visitor pattern}
 
-One potential drawback of the visitor pattern is that it requires the creation of a new visitor object type for each algoritm that operates on the derived type. In some cases, the creation of a dedicated class is excessive, and it would be more convenient to write the visitor clauses inline, in a form that resembles a \mycode{switch} statement, as shown in the listing below.
+One potential drawback of the visitor pattern is that it requires the creation 
+of a new visitor object type for each algorithm that operates on the derived 
+type. In some cases, the class created will not be reused and much like a 
+lambda, it would be more convenient to write the visitor clauses inline, in a 
+form that resembles a \mycode{switch} statement, as shown in the listing 
+below. We omit \mycode{std::} for brevity.
 
 {\small\begin{verbatim}
 int CountSides(Polygon& p)
@@ -174,17 +180,15 @@ template <typename T,
           typename F,
           typename BaseInner,
           typename ArgsT>
-class ComposeVisitor
+struct ComposeVisitor
 {
-public:
-  class Inner : public BaseInner
+  struct Inner : public BaseInner
   {
-  public:
     using BaseInner::Visit;
   
     Inner(ArgsT&& args) :
-      BaseInner(std::move(args.second)),
-      m_f(std::move(args.first))
+      BaseInner(move(args.second)),
+      m_f(move(args.first))
     {
     }
   
@@ -198,46 +202,45 @@ public:
   };
   
   ComposeVisitor(ArgsT&& args) :
-    m_args(std::move(args))
+    m_args(move(args))
   {
   }
   
+
   template <typename Tadd,
             typename Fadd>
   ComposeVisitor<
     Tadd,
     Fadd,
     Inner,
-    std::pair<Fadd, ArgsT>> on(Fadd&& f)
+    pair<Fadd, ArgsT>> on(Fadd&& f)
   {
     return ComposeVisitor
       Tadd,
       Fadd,
       Inner,
-      std::pair<Fadd, ArgsT>>(
-        std::make_pair(
-          std::move(f),
-          std::move(m_args)));
+      pair<Fadd, ArgsT>>(
+        make_pair(
+          move(f),
+          move(m_args)));
   }
   
   Inner end_visitor()
   {
-    return Inner(std::move(m_args));
+    return Inner(move(m_args));
   }
   
   ArgsT m_args;
 };
 
 template <typename TVisitorBase>
-class EmptyVisitor
+struct EmptyVisitor
 {
-public:
-  class Inner : public TVisitorBase
+  struct Inner : public TVisitorBase
   {
-  public:
     using TVisitorBase::Visit;
   
-    Inner(std::nullptr_t) {}
+    Inner(nullptr_t) {}
   };
   
   template <typename Tadd, typename Fadd>
@@ -245,15 +248,15 @@ public:
     Tadd,
     Fadd,
     Inner,
-    std::pair<Fadd, std::nullptr_t>> on(Fadd&& f)
+    pair<Fadd, nullptr_t>> on(Fadd&& f)
   {
     return ComposeVisitor<
       Tadd,
       Fadd,
       Inner,
-      std::pair<Fadd, std::nullptr_t>>(
-        std::make_pair(
-          std::move(f),
+      pair<Fadd, nullptr_t>>(
+        make_pair(
+          move(f),
           nullptr));
   }
 };
@@ -275,7 +278,7 @@ Invoking \mycode{on<T1>} on a $t_0$ object returns an object which implements th
     EmptyVisitor<T>,
     pair<F1,nullptr_t>>
 \end{verbatim}}
-which derives from $t_0$. (We omit \mycode{std::} for brevity.)
+which derives from $t_0$.
 
 Invoking \mycode{on<T2>} on a $t_1$ object returns an object which implements the \mycode{Visit(T2\&)} member that executes a function object with type \mycode{F2}. This object has type $t_2\, =$
 {\small\begin{verbatim}
@@ -291,11 +294,11 @@ Invoking \mycode{on<T2>} on a $t_1$ object returns an object which implements th
 \end{verbatim}}
 which derives from $t_1$, and so forth. These nested calls proceeds until a type is available which implements all the visitor members.
 
-The pattern is complicated by the fact that no intermediate object returned in the nested series of calls to \mycode{on} is allowed to be abstract. As a solution, we construct the visitor type as an \emph{inner class}, and use \mycode{end\_visitor} to return an object of this inner class type at the end. Inner class types are allowed remain abstract, provided they are never constructed. If the \mycode{end\_visitor} function is invoked before the inner visitor class has concrete implementations for all \mycode{Visit} members, then the compiler will signal that the programmer has attempt to construct an object with an abstract type; otherwise a visitor is successfully returned.
+The pattern is complicated by the fact that no intermediate object returned in the nested series of calls to \mycode{on} is allowed to be abstract. As a solution, we construct the visitor type as an \emph{inner class}, and use \mycode{end\_visitor} to return an object of this inner class type at the end. If the \mycode{end\_visitor} function is invoked before the inner visitor class has concrete implementations for all \mycode{Visit} members, then the compiler will signal that the programmer has attempt to construct an object with an abstract type; otherwise a visitor is successfully returned.
 
-A few advantages of this approach are notable compile-time. Firstly, because the \mycode{override} qualifier is included on the \mycode{Visit} member function, it is not possible to include a superfluous clause, which does not correspond to a type overload in the visitor base. Secondly, because the \mycode{final} qualifier is included on the \mycode{Visit} member function it is not possible to include a visit clause more than once. (If the \mycode{final} keyword were omitted, the most recent call to \mycode{on} would be observed for a given type.)
+A few advantages of this approach are notable compile-time [!!reword-jbc]. Firstly, because the \mycode{override} qualifier is included on the \mycode{Visit} member function, it is not possible to include a superfluous clause, which does not correspond to a type overload in the visitor base. Secondly, because the \mycode{final} qualifier is included on the \mycode{Visit} member function it is not possible to include a visit clause more than once. (If the \mycode{final} keyword were omitted, the most recent call to \mycode{on} would be observed for a given type.)
 
-That inline visitors cannot be constructed when clauses are missing may also be considered desirable in some contexts. For instance, if a new type \mycode{Hexagon} is derived from \mycode{Polygon}, then the code base will compile only when appropriate code paths have been introduced to handle it. In large code bases, this may serve maintainability. If it is deemed that a visitor clause should have some default behaviour (e.g., no operation), a visitor base can be passed into \mycode{start\_visitor} that specifies an empty, virtual implementation.
+That inline visitors cannot be constructed when clauses are missing may also be considered desirable in some contexts. For instance, if a new type \mycode{Hexagon} is derived from \mycode{Polygon}, then the code base will compile only when appropriate code paths have been introduced to handle it. In large code bases, this may serve maintainability. If it is deemed that a visitor clause should have some default behaviour (e.g., no operation), a visitor base can be passed into \mycode{start\_visitor}.
 
 \section{Performance considerations}
 
