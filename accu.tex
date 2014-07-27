@@ -38,135 +38,152 @@
 
 \makeatletter
 
-\title{An Inline Visitor Design Pattern for C++11}
-% ^ decided to run with title?
+\title{Defining Visitors Inline in C++11}
 \author{Robert W. Mill \and Jonathan B. Coe}
 
-\begin{document}
+\begin{document} 
 \maketitle
 
-Object-oriented programmers often wish to perform a function on an object of polymorphic type, such that the behaviour of the function is specific to the derived type. For instance, suppose we derive from the abstract base class \mycode{Polygon} the concrete classes \mycode{Triangle} and \mycode{Square}. Now suppose that we require a function \mycode{CountSides}, which returns the number of sides in the polygon, \mycode{p}.
+In object-oriented programming, we may need to perform a function on an object
+of polymorphic type, such that the behaviour of the function is specific to the
+derived type. Suppose that for the abstract base class \mycode{Polygon} we
+derive the concrete classes \mycode{Triangle} and \mycode{Square}. The free
+function \mycode{CountSides}, returns the number of sides in the polygon,
+\mycode{p}.
 
-{\small\begin{verbatim}
-struct Polygon { };
+{\small\begin{verbatim}struct Polygon {};
 
-struct Triangle : Polygon
-{
-  // members
+struct Triangle : Polygon 
+{ 
+  // members 
 }
 
-struct Square : Polygon
-{
-  // members
+struct Square : Polygon 
+{ 
+  // members 
 }
 
-int CountSides(Polygon& p);
-{
-  // implementation
-}
-\end{verbatim}}
+int CountSides(Polygon& p)
+{ 
+  // implementation 
+}\end{verbatim}}
 
-Naturally, the algorithm used by \mycode{Angles} to compute its result depends on the derived type of \mycode{p}, which is problematic, because its argument is conveyed by a reference of the base class type, \mycode{Polygon}.
+\mycode{CountSides} will need the derived type of the polygon \mycode{p} to
+compute its result, which is problematic, because its argument is conveyed by a
+reference of the base class type, \mycode{Polygon}.
 
 \section{Visitor pattern}
 
-The \emph{visitor} design pattern offers a mechanism for switching to a code path specific to the derived type. The pattern uses the \mycode{this} pointer inside the class to identify the derived type. Each derived object must accept a visitor interface which provides a list of \mycode{Visit} members with single argument overloaded on various derived types.
+The \emph{visitor} design pattern offers a mechanism for type-specific handling
+using virtual dispatch. The pattern uses the \mycode{this} pointer inside the
+class to identify the derived type. Each derived object must \emph{accept} a
+visitor interface which provides a list of \mycode{Visit} members with single
+argument overloaded on various derived types.
 
-To continue our illustration, the \mycode{PolygonVisitor} is able to `visit' \mycode{Triangle}s and \mycode{Square}s, and all these polygons must be able to `accept' an \mycode{PolygonVisitor}.
+To continue our illustration, the \mycode{PolygonVisitor} is able to
+\emph{visit} \mycode{Triangle}s and \mycode{Square}s, and all these polygons
+must be able to \emph{accept} a \mycode{PolygonVisitor}.
 
-{\small\begin{verbatim}
-struct Triangle;
+{\small\begin{verbatim} 
+struct Triangle; 
 struct Square;
 
-
-struct PolygonVisitor
-{
+struct PolygonVisitor 
+{ 
   virtual ~PolygonVisitor() {}
 
-  virtual void Visit(Triangle& tr) = 0;
-  virtual void Visit(Square& sq) = 0;
+  virtual void visit(Triangle& tr) = 0; 
+  virtual void visit(Square& sq) = 0;
 };
 
-struct Polygon
-{
-  virtual void Accept(PolygonVisitor& v) = 0;
+struct Polygon 
+{ 
+  virtual void accept(PolygonVisitor& v) = 0; 
+};\end{verbatim}}
+
+\mycode{Square}s and \mycode{Triangle}s accept the visitor as follows. Observe
+that the \mycode{this} pointer is used to select the appropriate overloaded
+function in the visitor interface.
+
+{\small\begin{verbatim} 
+struct Triangle : Polygon 
+{ 
+  void accept(PolygonVisitor&v) override 
+  { 
+    v.Visit(*this); 
+  } 
 };
-\end{verbatim}}
 
-Squares and triangles accept the visitor as follows. Observe that the \mycode{this} pointer is used to select the appropriate overloaded function in the visitor interface.
-
-{\small\begin{verbatim}
-struct Triangle : Polygon
-{
-  void Accept(PolygonVisitor& v) override
+struct Square : Polygon 
+{ 
+  void accept(PolygonVisitor& v) override 
   {
-    v.Visit(*this);
-  }
-};
+    v.Visit(*this); 
+  } 
+};\end{verbatim}}
 
-struct Square : Polygon
-{
-  void Accept(PolygonVisitor& v) override
-  {
-    v.Visit(*this);
-  }
-};
-\end{verbatim}}
+A visitor object, \mycode{SideCounter}, which counts the number of sides of a
+polygon and stores the result, is implemented and used as follows.
 
-A visitor object, \mycode{SideCounter}, which counts the number of sides of a polygon and stores the result, is implemented and used as follows.
-
-{\small\begin{verbatim}
-struct SideCounter : PolygonVisitor
-{
-  void Visit(Square& sq) override
-  {
-    m_sides = 4;
-  }
-  
-  void Visit(Triangle& tr) override
-  {
-    m_sides = 3;
+{\small\begin{verbatim} 
+struct SideCounter : PolygonVisitor 
+{ 
+  void visit(Square&sq) override 
+  { 
+    m_sides = 4; 
   }
   
-  int m_sides = 0;
+  void visit(Triangle& tr) override 
+  { 
+    m_sides = 3; 
+  }
+  
+  int m_sides = 0; 
 };
 
-int CountSides(Polygon& p)
-{
-  SideCounter sideCounter;
+int CountSides(Polygon& p) 
+{ 
+  SideCounter sideCounter; 
   p.Accept(sideCounter);
-  return sideCounter.m_sides;
-}
-\end{verbatim}}
+  return sideCounter.m_sides; 
+}\end{verbatim}}
 
 \section{Inline visitor pattern}
 
-One potential drawback of the visitor pattern is that it requires the creation  of a new visitor object type for each algorithm that operates on the derived type. In some cases, the class created will not be reused and, much like a lambda, it would be more convenient to write the visitor clauses inline. The listing below shows how this can be accomplished in a form that resembles a \mycode{switch} statement.
+One potential drawback of the visitor pattern is that it requires the creation
+of a new visitor object type for each algorithm that operates on the derived
+type. In some cases, the class created will not be reused and, much like a
+lambda, it would be more convenient to write the visitor clauses inline. The
+listing below shows how this can be accomplished in a form that resembles a
+\mycode{switch} statement.
 
-{\small\begin{verbatim}
-int CountSides(Polygon& p)
-{
+{\small\begin{verbatim} 
+int CountSides(Polygon& p) 
+{ 
   int sides = 0;
   
-  auto v =
-    begin_visitor<PolygonVisitor>
-    .on<Triangle>([&sides](Triangle& tr)
+  auto v = begin_visitor<PolygonVisitor> 
+    .on<Triangle>([&sides](Triangle& tr) 
     {
-      sides = 3;
-    })
-    .on<Square>([&sides](Square& sq)
-    {
-      sides = 4;
-    })
+      sides = 3; 
+    }) 
+    .on<Square>([&sides](Square& sq) 
+    { 
+      sides = 4; 
+    }) 
     .end_visitor();
   
-  p.Accept(v);
-  return sides;
-}
-\end{verbatim}}
+  p.Accept(v); 
+  return sides; 
+} \end{verbatim}}
 
-% do we need to explicitly say omit std::  (could have use namespace std in listing - I think they will guess)
-In Listing~1 we demonstrate generic code that permits the \mycode{begin\_visitor} ... \mycode{end\_visitor} construction to be used with any visitor base. The principle behind the pattern is simple. The initial \mycode{start\_visitor} call returns an object which implements the visitor interface \emph{abstractly}; subsequent calls of the \mycode{on} function implement a \mycode{Visit} function which takes objects of the template argument type as an argument; and the \mycode{end\_visitor} call returns the \emph{concrete} visitor object.
+In Listing~1 we demonstrate generic code that permits the
+\mycode{begin\_visitor} ... \mycode{end\_visitor} construction to be used with
+any visitor base. The initial \mycode{start\_visitor} call returns an object
+which implements the visitor interface \emph{abstractly}; subsequent calls of
+the \mycode{on} function implement a \mycode{Visit} function which takes objects
+of the template argument type as an argument; and the \mycode{end\_visitor} call
+returns the \emph{concrete} visitor object.
 
 \subsection{Listing 1}
 
@@ -264,7 +281,10 @@ EmptyVisitor<TVisitorBase> begin_visitor()
 }
 \end{verbatim}}
 
-The \mycode{start\_visitor<VisitorBase>} function returns an object $t_0 = \mbox{\mycode{EmptyVisitor<VisitorBase>}}$ which has the pure visitor interface \mycode{VisitorBase} as a base class, but does not implement any \mycode{Visit} members.
+The \mycode{start\_visitor<VisitorBase>} function returns an object $t_0 =
+\mbox{\mycode{EmptyVisitor<VisitorBase>}}$ which has the pure visitor interface
+\mycode{VisitorBase} as a base class, but does not implement any \mycode{Visit}
+members.
 
 Invoking \mycode{on<T1>} on a $t_0$ object returns an object which implements the \mycode{Visit(T1\&)} member that executes a function object with type \mycode{F1}. This object has type $t_1\, =$
 {\small\begin{verbatim}
@@ -290,11 +310,31 @@ Invoking \mycode{on<T2>} on a $t_1$ object returns an object which implements th
 \end{verbatim}}
 which derives from $t_1$, and so forth. These nested calls proceed until a type is available which implements all the visitor members.
 
-The pattern is complicated by the fact that no intermediate object returned in the nested series of calls to \mycode{on} is allowed to be abstract. As a solution, we construct the visitor type as an \emph{inner class} and use \mycode{end\_visitor} to return an object of this inner class type. If the \mycode{end\_visitor} function is invoked before the inner visitor class has concrete implementations for all \mycode{Visit} members, then the compiler will signal that the programmer has attempted to construct an object with an abstract type; otherwise a visitor is successfully returned.
+The pattern is complicated by the fact that no intermediate object returned in
+the nested series of calls to \mycode{on} is allowed to be abstract. As a
+solution, we construct the visitor type as an \emph{inner class} and use
+\mycode{end\_visitor} to return an object of this inner class type. If the
+\mycode{end\_visitor} function is invoked before the inner visitor class has
+concrete implementations for all \mycode{Visit} members, then the compiler will
+signal that the programmer has attempted to construct an object with an abstract
+type; otherwise a visitor is successfully returned.
 
-The consistency between the list of types used with \mycode{on} and those in the visitor base is verified at compilation. Because the \mycode{override} qualifier is included on the \mycode{Visit} member function, it is not possible to include a superfluous clause, which does not correspond to a type overload in the visitor base. Similarly, because the \mycode{final} qualifier is included on the \mycode{Visit} member function it is not possible to include a visit clause more than once. (If the \mycode{final} keyword were omitted, the most recent call to \mycode{on} would be observed for a given type.)
+The consistency between the list of types used with \mycode{on} and those in the
+visitor base is verified at compilation. Because the \mycode{override} qualifier
+is included on the \mycode{Visit} member function, it is not possible to include
+a superfluous clause, which does not correspond to a type overload in the
+visitor base. Similarly, because the \mycode{final} qualifier is included on the
+\mycode{Visit} member function it is not possible to include a visit clause more
+than once. (If the \mycode{final} keyword were omitted, the most recent call to
+\mycode{on} would be observed for a given type.)
 
-That inline visitors cannot be constructed when clauses are missing may also be considered desirable in some contexts. For instance, if a new type \mycode{Hexagon} is derived from \mycode{Polygon}, then the code base will compile only when appropriate code paths have been introduced to handle it. In large code bases, this may serve maintainability. If it is deemed that a visitor clause should have some default behaviour (e.g., no operation), a visitor base can be passed into \mycode{start\_visitor}.
+That inline visitors cannot be constructed when clauses are missing may also be
+considered desirable in some contexts. For instance, if a new type
+\mycode{Hexagon} is derived from \mycode{Polygon}, then the code base will
+compile only when appropriate code paths have been introduced to handle it. In
+large code bases, this may serve maintainability. If it is deemed that a visitor
+clause should have some default behaviour (e.g., no operation), a visitor base
+can be passed into \mycode{start\_visitor}.
 
 \section{Performance considerations}
 
@@ -302,11 +342,14 @@ That inline visitors cannot be constructed when clauses are missing may also be 
 
 - comment that it compiles with clang, gcc and VS12
 
-- comment that performance increase may result because compiler can inline anonymous functions unlike stand-alone visitor instance
+- comment that performance increase may result because compiler can inline
+anonymous functions unlike stand-alone visitor instance
  
 - Kevin's concerns about debugging?
 
-\textbf{How will we wind this up? Reading some of the Overload articles, it appears the tone is often quite informal. I think we should be chattier in the opening and closing paragraphs. Is much more needed? -rwm}
+\textbf{How will we wind this up? Reading some of the Overload articles, it
+appears the tone is often quite informal. I think we should be chattier in the
+opening and closing paragraphs. Is much more needed? -rwm}
 
 \end{document}
 
