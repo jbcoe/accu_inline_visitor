@@ -10,15 +10,15 @@ MinPos.y=-1
 MaxPos.x=-1
 MaxPos.y=-1
 NormalPos.left=4
-NormalPos.top=26
-NormalPos.right=1346
-NormalPos.bottom=502
+NormalPos.top=32
+NormalPos.right=1562
+NormalPos.bottom=663
 Class=LaTeXView
 Document=accu.tex
 
 [Frame0_View0,0]
-TopLine=30
-Cursor=1804
+TopLine=304
+Cursor=8656
 
 [SessionInfo]
 FrameCount=1
