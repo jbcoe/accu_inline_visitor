@@ -91,7 +91,7 @@ reference of the base class type, \mycode{Polygon}.
 The \emph{visitor} design pattern offers a mechanism for type-specific handling
 using virtual dispatch. The pattern uses the \mycode{this} pointer inside the
 class to identify the derived type. Each derived object must \emph{accept} a
-visitor interface which provides a list of \mycode{Visit} members with single
+visitor interface which provides a list of \mycode{Visit} members with a single
 argument overloaded on various derived types.
 
 To continue our illustration, the \mycode{PolygonVisitor} is able to
@@ -122,7 +122,7 @@ function in the visitor interface.
 {\small\begin{verbatim} 
 struct Triangle : Polygon 
 { 
-  void accept(PolygonVisitor&v) override 
+  void accept(PolygonVisitor& v) override 
   { 
     v.Visit(*this); 
   } 
@@ -142,7 +142,7 @@ polygon and stores the result, is implemented and used as follows.
 {\small\begin{verbatim} 
 struct SideCounter : PolygonVisitor 
 { 
-  void visit(Square&sq) override 
+  void visit(Square& sq) override 
   { 
     m_sides = 4; 
   }
@@ -318,8 +318,8 @@ a concrete visitor base can be passed into \mycode{start\_visitor}.
 
 With optimizations turned on MSVC 2013, GCC 4.9.1 and Clang 3.4.2 compile the
 inline visitor without introducing any cost. GCC and Clang produce identical
-assembler in the case when a visitor class is explicitly written out. MSVC
-produces different assembler for the inline visitor and explicit visitor class;
+assembly code in the case when a visitor class is explicitly written out. MSVC
+produces different assembly code for the inline visitor and explicit visitor class;
 the inline visitor has been measured to run marginally faster.
 
 Performance and convenience of the inline visitor mean that we would encourage
