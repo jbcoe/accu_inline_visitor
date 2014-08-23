@@ -89,10 +89,12 @@ reference of the base class type, \mycode{Polygon}.
 \section{Visitor pattern}
 
 The \emph{visitor} design pattern offers a mechanism for type-specific handling
-using virtual dispatch. The pattern uses the \mycode{this} pointer inside the
-class to identify the derived type. Each derived object must \emph{accept} a
-visitor interface which provides a list of \mycode{Visit} members with a single
-argument overloaded on various derived types.
+using virtual dispatch [REF: Gang of four]. In the words of Scott Meyers: 
+"Visitor lets you define a new operation without changing the classes of the
+elements on which it operates" [REF: Scott]. The pattern uses the \mycode{this}
+pointer inside the class to identify the derived type. Each derived object must
+\emph{accept} a visitor interface which provides a list of \mycode{Visit}
+members with a single argument overloaded on various derived types.
 
 To continue our illustration, the \mycode{PolygonVisitor} is able to
 \emph{visit} \mycode{Triangle}s and \mycode{Square}s, and all these polygons
@@ -300,11 +302,11 @@ EmptyVisitor<TVisitorBase> begin_visitor()
 
 The consistency between the list of types used with \mycode{on} and those in
 the visitor base is verified at compilation time. Since the \mycode{override}
-qualifier is specified on the \mycode{Visit} member function, it is not possible
-to add a superfluous \mycode{Visit} which does not correspond to a type overload
-in the visitor base. Similarly, because the \mycode{final} qualifier is
-specified on the \mycode{Visit} member function it is not possible to define a 
-\mycode{Visit} member function more than once. 
+qualifier is specified on the \mycode{Visit} member function, it is not
+possible to add a superfluous \mycode{Visit} which does not correspond to a
+type overload in the visitor base. Similarly, because the \mycode{final}
+qualifier is specified on the \mycode{Visit} member function it is not possible
+to define a \mycode{Visit} member function more than once. 
 
 That inline visitors cannot be constructed when clauses are missing may also be
 considered desirable in some contexts. For instance, if a new type
@@ -314,17 +316,48 @@ handle it. In large code bases, this may serve maintainability. If it is deemed
 that a visitor clause should have some default behaviour (e.g., no operation),
 a concrete visitor base can be passed into \mycode{start\_visitor}.
 
+
 \section{Performance}
 
 With optimizations turned on MSVC 2013, GCC 4.9.1 and Clang 3.4.2 compile the
 inline visitor without introducing any cost. GCC and Clang produce identical
 assembly code in the case when a visitor class is explicitly written out. MSVC
-produces different assembly code for the inline visitor and explicit visitor class;
-the inline visitor has been measured to run marginally faster.
+produces different assembly code for the inline visitor and explicit visitor
+class; the inline visitor has been measured to run marginally faster.
 
-Performance and convenience of the inline visitor mean that we would encourage
-its use where type-specific handling is logically localized.
+
+\section{Other Visitor}
+
+Loki's Acyclic Visitor [REF: Acyclic Visitor, Loki] removes compile-time coupling
+from visiting and visited classes but at the cost of introducing dynamic casts
+and run-time detection of unhandled types. When run-time performance and
+compile-time detection of unhandled types are favoured over shorter
+compile-times then we would recommend use of the inline visitor.
+
+The inline visitor does not have the flexibility of the Cooperative Visitor
+[REF: Cooperative visitor], which allows different method names and return
+types, but as it is intended to be lightweight this flexibility is not needed:
+the visit functions are not explicitly named and variables in local scope can
+be modified by lambda capture alleviating the need for a return value. 
+
+
+\section{Conclusion}
+
+We have presented a method for defining inline visitors in standard C++. The
+method does not, by design, remove the tight coupling between visited and
+visiting class heirarchies. We have found the tight coupling to be desirable
+when the addition of new types necessitates their explicit consideration by
+relevant domain experts. 
+
+Performance, portability and convenience of the inline visitor mean that we
+would encourage its use where tight-coupling is acceptable and type-specific
+handling is logically localized.
 
 \end{document}
+
+%[REF: Gang of four] : E.Gamma et al. Design Patterns ( Addison-Wesley Longman, 1995) 
+%[REF: Scott] : http://www.artima.com/cppsource/top_cpp_aha_moments.html - "Visitor lets you define a new operation without changing the classes of the elements on which it operates."
+%[REF: Acyclic Visitor, Loki] : http://www.objectmentor.com/resources/articles/acv.pdf; http://loki-lib.sourceforge.net/
+%[REF: Cooperative visitor] http://www.artima.com/cppsource/cooperative_visitor.html
 
 % end of file %
