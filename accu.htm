@@ -49,9 +49,9 @@ reference of the base class type, <tt>Polygon</tt>.
 <h3>Visitor pattern</h3>
 
 The <i>visitor</i> design pattern offers a mechanism for type-specific handling
-using virtual dispatch [REF: Gang of four]. In the words of Scott Meyers: 
+using virtual dispatch [1]. In the words of Scott Meyers: 
 "Visitor lets you define a new operation without changing the classes of the
-elements on which it operates" [REF: Scott]. The pattern uses the <tt>this</tt>
+elements on which it operates" [2]. The pattern uses the <tt>this</tt>
 pointer inside the class to identify the derived type. Each derived object must
 <i>accept</i> a visitor interface which provides a list of <tt>Visit</tt>
 members with a single argument overloaded on various derived types.
@@ -159,7 +159,7 @@ int CountSides(Polygon& p)
 
 In Listing~1 we demonstrate generic code that permits the
 <tt>begin_visitor</tt> ... <tt>end_visitor</tt> construction to be used with
-any visitor base. The initial <tt>start_visitor</tt> call instantiates a class
+any visitor base. The initial <tt>begin_visitor</tt> call instantiates a class
 which defines an inner object inheriting from the visitor interface; each
 subsequent call of the <tt>on</tt> function instantiates a class whose inner
 class inherits from the previous inner class implementing an additional
@@ -274,7 +274,7 @@ considered desirable in some contexts. For instance, if a new type
 compile only when appropriate <tt>Visit</tt> functions been introduced to
 handle it. In large code bases, this may serve maintainability. If it is deemed
 that a visitor clause should have some default behaviour (e.g., no operation),
-a concrete visitor base can be passed into <tt>start_visitor</tt>.
+a concrete visitor base can be passed into <tt>begin_visitor</tt>.
 
 <h3>Performance</h3>
 
@@ -286,14 +286,14 @@ class; the inline visitor has been measured to run marginally faster.
 
 <h3>Other Visitor</h3>
 
-Loki's Acyclic Visitor [REF: Acyclic Visitor, Loki] removes compile-time coupling
+Loki's Acyclic Visitor [3,4] removes compile-time coupling
 from visiting and visited classes but at the cost of introducing dynamic casts
 and run-time detection of unhandled types. When run-time performance and
 compile-time detection of unhandled types are favoured over shorter
 compile-times then we would recommend use of the inline visitor.
 
 The inline visitor does not have the flexibility of the Cooperative Visitor
-[REF: Cooperative visitor], which allows different method names and return
+[5], which allows different method names and return
 types, but as it is intended to be lightweight this flexibility is not needed:
 the visit functions are not explicitly named and variables in local scope can
 be modified by lambda capture alleviating the need for a return value. 
@@ -302,19 +302,30 @@ be modified by lambda capture alleviating the need for a return value.
 
 We have presented a method for defining inline visitors in standard C++. The
 method does not, by design, remove the tight coupling between visited and
-visiting class heirarchies. We have found the tight coupling to be desirable
-when the addition of new types necessitates their explicit consideration by
-relevant domain experts. 
+visiting class hierarchies. We have found the tight coupling to be desirable
+when the addition of new types requires explicit consideration of their handling
+throughout the code base.
 
 Performance, portability and convenience of the inline visitor mean that we
 would encourage its use where tight-coupling is acceptable and type-specific
 handling is logically localized.
 
-<!--
-%[REF: Gang of four] : E.Gamma et al. Design Patterns ( Addison-Wesley Longman, 1995) 
-%[REF: Scott] : http://www.artima.com/cppsource/top_cpp_aha_moments.html - "Visitor lets you define a new operation without changing the classes of the elements on which it operates."
-%[REF: Acyclic Visitor, Loki] : http://www.objectmentor.com/resources/articles/acv.pdf; http://loki-lib.sourceforge.net/
-%[REF: Cooperative visitor] http://www.artima.com/cppsource/cooperative_visitor.html
--->
+<h3>References</h3>
+
+<!-- REF: Gang of four -->
+<p>[1] E. Gamma et al., <i>Design Patterns</i>, Addison-Wesley Longman, 1995.</p>
+
+<!-- REF: Scott -->
+<p>[2] S. Meyers, My Most Important C++ Aha! Moments...Ever, <i>Artima Developer</i> 
+[<a href="http://www.artima.com/cppsource/top_cpp_aha_moments.html">link</a>]</p>
+
+<!-- REF: Acyclic Visitor, Loki -->
+<p>[3] R. C. Martin, <i>Acyclic Visitor</i>
+[<a href="http://www.objectmentor.com/resources/articles/acv.pdf"</a>link</a>],  
+
+<p>[4] <i>Loki library</i> [<a href="http://loki-lib.sourceforge.net/">link</a>]</p>
+
+<!-- REF: Cooperative visitor -->
+<p>[5] A. S. Krishnamoorthi, Cooperative Visitor: A Template Technique for Visitor Creation, <i>Artima Developer</i> [<a href="http://www.artima.com/cppsource/cooperative_visitor.html">link</a>]</p>
 
 </html>
