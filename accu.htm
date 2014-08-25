@@ -8,9 +8,9 @@
 <p>The visitor pattern can be useful when type-specific handling is required and
 tight coupling of type-handling logic and handled types is either an acceptable
 cost or desirable in its own right. We've found that selective application of
-the visitor pattern adds strong compile-time safety, as the handling of new types
-needs explicit consideration in every context where type-specific handling
-occurs. The visitor pattern presents an inversion of control that can feel
+the classical visitor pattern adds strong compile-time safety, as the handling of
+new types needs explicit consideration in every context where type-specific
+handling occurs. The visitor pattern presents an inversion of control that can feel
 unnatural and often requires introduction of considerable non-local boilerplate
 code. We've found that this slows adoption of the visitor pattern especially
 among engineers and scientists who traditionally write their type-handling
@@ -284,7 +284,7 @@ assembly code in the case when a visitor class is explicitly written out. MSVC
 produces different assembly code for the inline visitor and explicit visitor
 class; the inline visitor has been measured to run marginally faster.
 
-<h3>Other Visitor</h3>
+<h3>Other Visitors</h3>
 
 Loki's Acyclic Visitor [3,4] removes compile-time coupling
 from visiting and visited classes but at the cost of introducing dynamic casts
@@ -302,13 +302,9 @@ be modified by lambda capture alleviating the need for a return value.
 
 We have presented a method for defining inline visitors in standard C++. The
 method does not, by design, remove the tight coupling between visited and
-visiting class hierarchies. We have found the tight coupling to be desirable
-when the addition of new types requires explicit consideration of their handling
-throughout the code base.
-
-Performance, portability and convenience of the inline visitor mean that we
-would encourage its use where tight-coupling is acceptable and type-specific
-handling is logically localized.
+visiting class hierarchies.  Performance, portability and convenience of the 
+inline visitor mean that we would encourage its use where tight-coupling is
+acceptable and type-specific handling is logically localized.
 
 <h3>References</h3>
 
