@@ -1,0 +1,320 @@
+<html>
+
+<body>
+
+<h1>Defining Visitors Inline in Modern C++</h1>
+<h2>Robert W. Mill and Jonathan B. Coe</h2>
+
+<p>The visitor pattern can be useful when type-specific handling is required and
+tight coupling of type-handling logic and handled types is either an acceptable
+cost or desirable in its own right. We've found that selective application of
+the visitor pattern adds strong compile-time safety, as the handling of new types
+needs explicit consideration in every context where type-specific handling
+occurs. The visitor pattern presents an inversion of control that can feel
+unnatural and often requires introduction of considerable non-local boilerplate
+code. We've found that this slows adoption of the visitor pattern especially
+among engineers and scientists who traditionally write their type-handling
+logic inline. Here we present a solution for defining visitors inline.</p>
+
+<h3>The Problem</h3>
+
+In object-oriented programming, we may need to perform a function on an object
+of polymorphic type, such that the behaviour of the function is specific to the
+derived type. Suppose that for the abstract base class <tt>Polygon</tt> we
+derive the concrete classes <tt>Triangle</tt> and <tt>Square</tt>. The free
+function <tt>CountSides</tt>, returns the number of sides in the polygon,
+<tt>p</tt>.
+
+<pre>
+struct Triangle : Polygon 
+{ 
+  // members 
+}
+
+struct Square : Polygon 
+{ 
+  // members 
+}
+
+int CountSides(Polygon& p)
+{ 
+  // implementation 
+}
+</pre>
+
+<tt>CountSides</tt> will need the derived type of the polygon <tt>p</tt> to
+compute its result, which is problematic, because its argument is conveyed by a
+reference of the base class type, <tt>Polygon</tt>.
+
+<h3>Visitor pattern</h3>
+
+The <i>visitor</i> design pattern offers a mechanism for type-specific handling
+using virtual dispatch [REF: Gang of four]. In the words of Scott Meyers: 
+"Visitor lets you define a new operation without changing the classes of the
+elements on which it operates" [REF: Scott]. The pattern uses the <tt>this</tt>
+pointer inside the class to identify the derived type. Each derived object must
+<i>accept</i> a visitor interface which provides a list of <tt>Visit</tt>
+members with a single argument overloaded on various derived types.
+
+To continue our illustration, the <tt>PolygonVisitor</tt> is able to
+<i>visit</i> <tt>Triangle</tt>s and <tt>Square</tt>s, and all these polygons
+must be able to <i>accept</i> a <tt>PolygonVisitor</tt>.
+
+<pre>
+struct Triangle; 
+struct Square;
+
+struct PolygonVisitor 
+{ 
+  virtual ~PolygonVisitor() {}
+
+  virtual void visit(Triangle& tr) = 0; 
+  virtual void visit(Square& sq) = 0;
+};
+
+struct Polygon 
+{ 
+  virtual void accept(PolygonVisitor& v) = 0; 
+}
+</pre>
+
+<tt>Square</tt>s and <tt>Triangle</tt>s accept the visitor as follows. Observe
+that the <tt>this</tt> pointer is used to select the appropriate overloaded
+function in the visitor interface.
+
+<pre>
+struct Triangle : Polygon 
+{ 
+  void accept(PolygonVisitor& v) override 
+  { 
+    v.Visit(*this); 
+  } 
+};
+
+struct Square : Polygon 
+{ 
+  void accept(PolygonVisitor& v) override 
+  {
+    v.Visit(*this); 
+  } 
+};
+</pre>
+
+A visitor object, <tt>SideCounter</tt>, which counts the number of sides of a
+polygon and stores the result, is implemented and used as follows.
+
+<pre>
+struct SideCounter : PolygonVisitor 
+{ 
+  void visit(Square& sq) override 
+  { 
+    m_sides = 4; 
+  }
+  
+  void visit(Triangle& tr) override 
+  { 
+    m_sides = 3; 
+  }
+  
+  int m_sides = 0; 
+};
+
+int CountSides(Polygon& p) 
+{ 
+  SideCounter sideCounter; 
+  p.Accept(sideCounter);
+  return sideCounter.m_sides; 
+}
+</pre>
+
+<h3>Inline visitor pattern</h3>
+
+One potential drawback of the visitor pattern is that it requires the creation
+of a new visitor object type for each algorithm that operates on the derived
+type. In some cases, the class created will not be reused and, much like a
+lambda, it would be more convenient to write the visitor clauses inline. The
+listing below shows how this can be accomplished in a form that resembles a
+<tt>switch</tt> statement.
+
+<pre>
+int CountSides(Polygon& p) 
+{ 
+  int sides = 0;
+  
+  auto v = begin_visitor<PolygonVisitor> 
+    .on<Triangle>([&sides](Triangle& tr) 
+    {
+      sides = 3; 
+    }) 
+    .on<Square>([&sides](Square& sq) 
+    { 
+      sides = 4; 
+    }) 
+    .end_visitor();
+  
+  p.Accept(v); 
+  return sides; 
+}
+</pre>
+
+In Listing~1 we demonstrate generic code that permits the
+<tt>begin_visitor</tt> ... <tt>end_visitor</tt> construction to be used with
+any visitor base. The initial <tt>start_visitor</tt> call instantiates a class
+which defines an inner object inheriting from the visitor interface; each
+subsequent call of the <tt>on</tt> function instantiates a class whose inner
+class inherits from the previous inner class implementing an additional
+<tt>Visit</tt> function.  Finally the <tt>end_visitor</tt> call returns an
+instance of the the inner visitor class.
+
+<h4>Listing 1</h4>
+
+<pre>
+template <typename T,
+          typename F,
+          typename BaseInner,
+          typename ArgsT>
+struct ComposeVisitor
+{
+  struct Inner : public BaseInner
+  {
+    using BaseInner::Visit;
+  
+    Inner(ArgsT&& args) :
+      BaseInner(move(args.second)),
+      m_f(move(args.first))
+    {
+    }
+  
+    void Visit(T& t) final override
+    {
+      m_f(t);
+    }
+  
+  private:
+    F m_f;
+  };
+  
+  ComposeVisitor(ArgsT&& args) :
+    m_args(move(args))
+  {
+  }
+
+  template <typename Tadd,
+            typename Fadd>
+  ComposeVisitor<
+    Tadd,
+    Fadd,
+    Inner,
+    pair<Fadd, ArgsT>> on(Fadd&& f)
+  {
+    return ComposeVisitor
+      Tadd,
+      Fadd,
+      Inner,
+      pair<Fadd, ArgsT>>(
+        make_pair(
+          move(f),
+          move(m_args)));
+  }
+  
+  Inner end_visitor()
+  {
+    return Inner(move(m_args));
+  }
+  
+  ArgsT m_args;
+};
+
+template <typename TVisitorBase>
+struct EmptyVisitor
+{
+  struct Inner : public TVisitorBase
+  {
+    using TVisitorBase::Visit;
+  
+    Inner(nullptr_t) {}
+  };
+  
+  template <typename Tadd, typename Fadd>
+  ComposeVisitor<
+    Tadd,
+    Fadd,
+    Inner,
+    pair<Fadd, nullptr_t>> on(Fadd&& f)
+  {
+    return ComposeVisitor<
+      Tadd,
+      Fadd,
+      Inner,
+      pair<Fadd, nullptr_t>>(
+        make_pair(
+          move(f),
+          nullptr));
+  }
+};
+
+template <typename TVisitorBase>
+EmptyVisitor<TVisitorBase> begin_visitor()
+{
+  return EmptyVisitor<TVisitorBase>();
+}
+</pre>
+
+The consistency between the list of types used with <tt>on</tt> and those in
+the visitor base is verified at compilation time. Since the <tt>override</tt>
+qualifier is specified on the <tt>Visit</tt> member function, it is not
+possible to add a superfluous <tt>Visit</tt> which does not correspond to a
+type overload in the visitor base. Similarly, because the <tt>final</tt>
+qualifier is specified on the <tt>Visit</tt> member function it is not possible
+to define a <tt>Visit</tt> member function more than once. 
+
+That inline visitors cannot be constructed when clauses are missing may also be
+considered desirable in some contexts. For instance, if a new type
+<tt>Hexagon</tt> is derived from <tt>Polygon</tt>, then the code base will
+compile only when appropriate <tt>Visit</tt> functions been introduced to
+handle it. In large code bases, this may serve maintainability. If it is deemed
+that a visitor clause should have some default behaviour (e.g., no operation),
+a concrete visitor base can be passed into <tt>start_visitor</tt>.
+
+<h3>Performance</h3>
+
+With optimizations turned on MSVC 2013, GCC 4.9.1 and Clang 3.4.2 compile the
+inline visitor without introducing any cost. GCC and Clang produce identical
+assembly code in the case when a visitor class is explicitly written out. MSVC
+produces different assembly code for the inline visitor and explicit visitor
+class; the inline visitor has been measured to run marginally faster.
+
+<h3>Other Visitor</h3>
+
+Loki's Acyclic Visitor [REF: Acyclic Visitor, Loki] removes compile-time coupling
+from visiting and visited classes but at the cost of introducing dynamic casts
+and run-time detection of unhandled types. When run-time performance and
+compile-time detection of unhandled types are favoured over shorter
+compile-times then we would recommend use of the inline visitor.
+
+The inline visitor does not have the flexibility of the Cooperative Visitor
+[REF: Cooperative visitor], which allows different method names and return
+types, but as it is intended to be lightweight this flexibility is not needed:
+the visit functions are not explicitly named and variables in local scope can
+be modified by lambda capture alleviating the need for a return value. 
+
+<h3>Conclusion</h3>
+
+We have presented a method for defining inline visitors in standard C++. The
+method does not, by design, remove the tight coupling between visited and
+visiting class heirarchies. We have found the tight coupling to be desirable
+when the addition of new types necessitates their explicit consideration by
+relevant domain experts. 
+
+Performance, portability and convenience of the inline visitor mean that we
+would encourage its use where tight-coupling is acceptable and type-specific
+handling is logically localized.
+
+<!--
+%[REF: Gang of four] : E.Gamma et al. Design Patterns ( Addison-Wesley Longman, 1995) 
+%[REF: Scott] : http://www.artima.com/cppsource/top_cpp_aha_moments.html - "Visitor lets you define a new operation without changing the classes of the elements on which it operates."
+%[REF: Acyclic Visitor, Loki] : http://www.objectmentor.com/resources/articles/acv.pdf; http://loki-lib.sourceforge.net/
+%[REF: Cooperative visitor] http://www.artima.com/cppsource/cooperative_visitor.html
+-->
+
+</html>
