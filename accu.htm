@@ -141,12 +141,12 @@ int CountSides(Polygon& p)
 { 
   int sides = 0;
   
-  auto v = begin_visitor<PolygonVisitor> 
-    .on<Triangle>([&sides](Triangle& tr) 
+  auto v = begin_visitor&lt;PolygonVisitor&gt;
+    .on&lt;Triangle&gt;([&sides](Triangle& tr) 
     {
       sides = 3; 
     }) 
-    .on<Square>([&sides](Square& sq) 
+    .on&lt;Square&gt;([&sides](Square& sq) 
     { 
       sides = 4; 
     }) 
@@ -157,7 +157,7 @@ int CountSides(Polygon& p)
 }
 </pre>
 
-In Listing~1 we demonstrate generic code that permits the
+In Listing 1 we demonstrate generic code that permits the
 <tt>begin_visitor</tt> ... <tt>end_visitor</tt> construction to be used with
 any visitor base. The initial <tt>begin_visitor</tt> call instantiates a class
 which defines an inner object inheriting from the visitor interface; each
@@ -169,10 +169,10 @@ instance of the the inner visitor class.
 <h4>Listing 1</h4>
 
 <pre>
-template <typename T,
+template &lt;typename T,
           typename F,
           typename BaseInner,
-          typename ArgsT>
+          typename ArgsT&gt;
 struct ComposeVisitor
 {
   struct Inner : public BaseInner
@@ -199,19 +199,19 @@ struct ComposeVisitor
   {
   }
 
-  template <typename Tadd,
-            typename Fadd>
-  ComposeVisitor<
+  template &lt;typename Tadd,
+            typename Fadd&gt;
+  ComposeVisitor&lt;
     Tadd,
     Fadd,
     Inner,
-    pair<Fadd, ArgsT>> on(Fadd&& f)
+    pair&lt;Fadd, ArgsT&gt;&gt; on(Fadd&& f)
   {
-    return ComposeVisitor
+    return ComposeVisitor&lt;
       Tadd,
       Fadd,
       Inner,
-      pair<Fadd, ArgsT>>(
+      pair&lt;Fadd, ArgsT&gt;&gt;(
         make_pair(
           move(f),
           move(m_args)));
@@ -225,7 +225,7 @@ struct ComposeVisitor
   ArgsT m_args;
 };
 
-template <typename TVisitorBase>
+template &lt;typename TVisitorBase&gt;
 struct EmptyVisitor
 {
   struct Inner : public TVisitorBase
@@ -235,28 +235,28 @@ struct EmptyVisitor
     Inner(nullptr_t) {}
   };
   
-  template <typename Tadd, typename Fadd>
-  ComposeVisitor<
+  template &lt;typename Tadd, typename Fadd&gt;
+  ComposeVisitor&lt;
     Tadd,
     Fadd,
     Inner,
-    pair<Fadd, nullptr_t>> on(Fadd&& f)
+    pair&lt;Fadd, nullptr_t&gt;&gt; on(Fadd&& f)
   {
-    return ComposeVisitor<
+    return ComposeVisitor&lt;
       Tadd,
       Fadd,
       Inner,
-      pair<Fadd, nullptr_t>>(
+      pair&lt;Fadd, nullptr_t&gt;&gt;(
         make_pair(
           move(f),
           nullptr));
   }
 };
 
-template <typename TVisitorBase>
-EmptyVisitor<TVisitorBase> begin_visitor()
+template &lt;typename TVisitorBase&gt;
+EmptyVisitor&lt;TVisitorBase&gt; begin_visitor()
 {
-  return EmptyVisitor<TVisitorBase>();
+  return EmptyVisitor&lt;TVisitorBase&gt;();
 }
 </pre>
 
