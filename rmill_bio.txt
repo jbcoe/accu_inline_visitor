@@ -1,0 +1,4 @@
+Robert Mill received his bachelor and Ph.D. degrees in Computer Science from
+the University of Sheffield. He now works in industrial process engineering as
+a mathematical developer, and retains an interest in machine learning and
+signal processing.
